@@ -2,6 +2,8 @@ package pbft
 
 import (
 	"container/heap"
+	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -182,6 +184,17 @@ func (m *msgQueueImpl) Pop() interface{} {
 	old[n-1] = nil
 	*m = old[0 : n-1]
 	return item
+}
+
+func (m *msgQueueImpl) GetMessagesAsString() string {
+	var sb strings.Builder
+	for i, msg := range *m {
+		if i == 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString(fmt.Sprintf("Message: %+v\n", msg))
+	}
+	return sb.String()
 }
 
 // cmpView compares two proto views.

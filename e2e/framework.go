@@ -82,6 +82,8 @@ type ClusterConfig struct {
 }
 
 func NewPBFTCluster(t *testing.T, config *ClusterConfig, hook ...transportHook) *Cluster {
+	os.Setenv("E2E_LOG_TO_FILES", "true")
+
 	names := make([]string, config.Count)
 	for i := 0; i < config.Count; i++ {
 		names[i] = fmt.Sprintf("%s_%d", config.Prefix, i)
@@ -280,13 +282,14 @@ func (c *Cluster) syncWithNetwork(nodeID string) (uint64, int64) {
 	return height, syncIndex
 }
 
-func (c *Cluster) getProposer(index int64) pbft.NodeID {
+func (c *Cluster) getProposer(index int64, nodeId string) pbft.NodeID {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	proposer := pbft.NodeID("")
 	if index >= 0 && int64(len(c.sealedProposals)-1) >= index {
 		proposer = c.sealedProposals[index].Proposer
+		fmt.Printf("[%s] SealedProposals=%v, Index=%v\n", nodeId, c.sealedProposals, index)
 	}
 
 	return proposer
@@ -482,7 +485,7 @@ func (n *node) Start() {
 			fsm := &fsm{
 				n:            n,
 				nodes:        n.nodes,
-				lastProposer: n.c.getProposer(n.getSyncIndex()),
+				lastProposer: n.c.getProposer(n.getSyncIndex(), n.name),
 
 				// important: in this iteration of the fsm we have increased our height
 				height:          n.getNodeHeight() + 1,
@@ -621,7 +624,7 @@ type valString struct {
 	lastProposer pbft.NodeID
 }
 
-func (v *valString) CalcProposer(round uint64) pbft.NodeID {
+func (v *valString) CalcProposer(round uint64, sequence uint64, id pbft.NodeID) pbft.NodeID {
 	seed := uint64(0)
 	if v.lastProposer == pbft.NodeID("") {
 		seed = round
@@ -635,7 +638,7 @@ func (v *valString) CalcProposer(round uint64) pbft.NodeID {
 
 	pick := seed % uint64(v.Len())
 	node := (v.nodes)[pick]
-	fmt.Printf("Calculated new proposer: %v based on round: %v, last proposer: %v, seed: %v, pick: %v.\n", node, round, v.lastProposer, seed, pick)
+	fmt.Printf("[%s] New Proposer=%v, Round=%v, Sequence=%v, Last proposer=%v, seed=%v, pick=%v.\n", id, node, round, sequence, v.lastProposer, seed, pick)
 	return node
 }
 

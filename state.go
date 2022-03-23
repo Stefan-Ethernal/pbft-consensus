@@ -277,8 +277,8 @@ func (c *currentState) resetRoundMsgs() {
 }
 
 // CalcProposer calculates the proposer and sets it to the state
-func (c *currentState) CalcProposer() {
-	c.proposer = c.validators.CalcProposer(c.view.Round)
+func (c *currentState) CalcProposer(id NodeID) {
+	c.proposer = c.validators.CalcProposer(c.view.Round, c.view.Sequence, id)
 }
 
 func (c *currentState) lock() {
@@ -357,7 +357,7 @@ func (c *currentState) numCommitted() int {
 }
 
 type ValidatorSet interface {
-	CalcProposer(round uint64) NodeID
+	CalcProposer(round uint64, sequence uint64, id NodeID) NodeID
 	Includes(id NodeID) bool
 	Len() int
 }

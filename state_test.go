@@ -468,7 +468,7 @@ func convertToMockValidatorSet(validatorIds []NodeID) ValidatorSet {
 
 type valString []NodeID
 
-func (v *valString) CalcProposer(round uint64) NodeID {
+func (v *valString) CalcProposer(round uint64, sequence uint64, id NodeID) NodeID {
 	seed := uint64(0)
 
 	offset := 0

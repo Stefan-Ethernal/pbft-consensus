@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -106,6 +107,10 @@ type SealedProposal struct {
 	CommittedSeals [][]byte
 	Proposer       NodeID
 	Number         uint64
+}
+
+func (s *SealedProposal) String() string {
+	return fmt.Sprintf("[%d] Proposer=%s", s.Number, s.Proposer)
 }
 
 type Backend interface {
@@ -301,7 +306,8 @@ func (p *Pbft) runAcceptState(ctx context.Context) { // start new round
 
 	// reset round messages
 	p.state.resetRoundMsgs()
-	p.state.CalcProposer()
+	p.state.CalcProposer(p.validator.NodeID())
+	p.logger.Printf("Proposer=%s\n", p.state.proposer)
 
 	isProposer := p.state.proposer == p.validator.NodeID()
 
@@ -412,6 +418,8 @@ func (p *Pbft) runAcceptState(ctx context.Context) { // start new round
 //
 // The Validate state is rather simple - all nodes do in this state is read messages and add them to their local snapshot state
 func (p *Pbft) runValidateState(ctx context.Context) { // start new round
+	p.logger.Println("[INFO] validate state")
+
 	ctx, span := p.tracer.Start(ctx, "ValidateState")
 	defer span.End()
 
@@ -525,6 +533,7 @@ func (p *Pbft) setStateSpanAttributes(span trace.Span) {
 }
 
 func (p *Pbft) runCommitState(ctx context.Context) {
+	p.logger.Println("[INFO] commit state")
 	_, span := p.tracer.Start(ctx, "CommitState")
 	defer span.End()
 
@@ -564,6 +573,7 @@ func (p *Pbft) handleStateErr(err error) {
 }
 
 func (p *Pbft) runRoundChangeState(ctx context.Context) {
+	p.logger.Printf("[INFO] round change state. Current round=%d", p.state.view.Round)
 	ctx, span := p.tracer.Start(ctx, "RoundChange")
 	defer span.End()
 
@@ -782,16 +792,7 @@ func (p *Pbft) HasMessages() bool {
 }
 
 func (p *Pbft) PushMessageInternal(msg *MessageReq) {
-	p.msgQueue.pushMessage(msg)
-}
-
-// PushMessage pushes a new message to the message queue
-func (p *Pbft) PushMessage(msg *MessageReq) {
-	if err := msg.Validate(); err != nil {
-		p.logger.Printf("[ERROR]: failed to validate msg: %v", err)
-		return
-	}
-
+	p.logger.Printf("Pushed Message: %+v", msg)
 	p.msgQueue.pushMessage(msg)
 
 	select {
@@ -800,9 +801,46 @@ func (p *Pbft) PushMessage(msg *MessageReq) {
 	}
 }
 
+// PushMessage pushes a new message to the message queue
+func (p *Pbft) PushMessage(msg *MessageReq) {
+	if err := msg.Validate(); err != nil {
+		p.logger.Printf("[ERROR]: failed to validate msg: %v", err)
+		return
+	}
+	p.PushMessageInternal(msg)
+}
+
 // Reads next message with discards from message queue based on current state, sequence and round
 func (p *Pbft) ReadMessageWithDiscards() (*MessageReq, []*MessageReq) {
-	return p.msgQueue.readMessageWithDiscards(p.getState(), p.state.view)
+	p.LogMsgQueueContent()
+	msg, discards := p.msgQueue.readMessageWithDiscards(p.getState(), p.state.view)
+	p.LogPulledMessages(msg, discards)
+	return msg, discards
+}
+
+// Log corresponding message queue content
+func (p *Pbft) LogMsgQueueContent() {
+	msgQueueContent := p.msgQueue.getQueue(p.getState()).GetMessagesAsString()
+	if msgQueueContent == "" {
+		p.logger.Println("MsgQueue: []")
+	} else {
+		p.logger.Printf("MsgQueue: [%v]", msgQueueContent)
+	}
+}
+
+// Log message pulled from corresponding message queue and discarded messages.
+func (p *Pbft) LogPulledMessages(msg *MessageReq, discards []*MessageReq) {
+	var sb strings.Builder
+	sb.WriteString("[")
+	for _, discard := range discards {
+		sb.WriteString(fmt.Sprintf("\n%+v", discard))
+	}
+	if len(discards) > 0 {
+		sb.WriteString("\n]")
+	} else {
+		sb.WriteString("]")
+	}
+	p.logger.Printf("Pulled Message: %+v\n\t\t\t\t\tDiscards: %+v\n", msg, sb.String())
 }
 
 // --- package-level helper functions ---
