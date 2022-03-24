@@ -16,10 +16,6 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-const (
-	MessagesBatchSize = 1000
-)
-
 // ReplayMessageCommand is a struct containing data for running replay-message command
 type ReplayMessageCommand struct {
 	UI cli.Ui
@@ -80,14 +76,12 @@ func (rmc *ReplayMessageCommand) Run(args []string) int {
 			}
 
 			sequence = message.Message.View.Sequence
-
-			if sequence == previousSequence {
-				messages = append(messages, message)
-			} else {
+			if sequence != previousSequence {
 				previousSequence = sequence
 				messagesChannel <- messages
 				messages = nil
 			}
+			messages = append(messages, message)
 		}
 		doneChannel <- struct{}{}
 	}(scanner)
