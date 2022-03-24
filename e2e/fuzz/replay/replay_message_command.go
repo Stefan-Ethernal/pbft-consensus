@@ -84,6 +84,11 @@ func (rmc *ReplayMessageCommand) Run(args []string) int {
 			}
 			messages = append(messages, message)
 		}
+
+		if len(messages) > 0 {
+			messagesChannel <- messages
+			messages = nil
+		}
 		doneChannel <- struct{}{}
 	}(scanner)
 

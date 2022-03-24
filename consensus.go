@@ -110,7 +110,7 @@ type SealedProposal struct {
 }
 
 func (s *SealedProposal) String() string {
-	return fmt.Sprintf("[%d] Proposer=%s", s.Number, s.Proposer)
+	return fmt.Sprintf("[%d] Proposer=%s. Proposal=%v", s.Number, s.Proposer, s.Proposal.Data)
 }
 
 type Backend interface {

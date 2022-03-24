@@ -134,10 +134,9 @@ func NewPBFTCluster(t *testing.T, config *ClusterConfig, hook ...transportHook) 
 }
 
 // insertFinalProposal inserts final proposal from the node to the cluster
-func (c *Cluster) insertFinalProposal(p *pbft.SealedProposal) {
+func (c *Cluster) insertFinalProposal(pbft *pbft.Pbft, p *pbft.SealedProposal) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
 	lastIndex := len(c.sealedProposals) - 1
 	insertIndex := p.Number - 1
 	if insertIndex == uint64(lastIndex) {
@@ -145,9 +144,12 @@ func (c *Cluster) insertFinalProposal(p *pbft.SealedProposal) {
 		if !c.sealedProposals[insertIndex].Proposal.Equal(p.Proposal) {
 			panic("Proposals are not equal")
 		}
+		pbft.Log(fmt.Sprintf("Proposal repeated %+v. InsertIndex=%d, LastIndex=%d\n", p, insertIndex, lastIndex))
 	} else {
 		c.sealedProposals = append(c.sealedProposals, p)
+		pbft.Log(fmt.Sprintf("Added proposal %+v. InsertIndex=%d, LastIndex=%d\n", p, insertIndex, lastIndex))
 	}
+	pbft.Log(fmt.Sprintf("SealedProposals=%+v\n", c.sealedProposals))
 }
 
 func (c *Cluster) resolveNodes(nodes ...[]string) []string {
@@ -289,7 +291,6 @@ func (c *Cluster) getProposer(index int64, nodeId string) pbft.NodeID {
 	proposer := pbft.NodeID("")
 	if index >= 0 && int64(len(c.sealedProposals)-1) >= index {
 		proposer = c.sealedProposals[index].Proposer
-		fmt.Printf("[%s] SealedProposals=%v, Index=%v\n", nodeId, c.sealedProposals, index)
 	}
 
 	return proposer
@@ -441,7 +442,7 @@ func (n *node) isStuck(num uint64) (uint64, bool) {
 }
 
 func (n *node) Insert(pp *pbft.SealedProposal) error {
-	n.c.insertFinalProposal(pp)
+	n.c.insertFinalProposal(n.pbft, pp)
 	return nil
 }
 
@@ -638,7 +639,6 @@ func (v *valString) CalcProposer(round uint64, sequence uint64, id pbft.NodeID) 
 
 	pick := seed % uint64(v.Len())
 	node := (v.nodes)[pick]
-	fmt.Printf("[%s] New Proposer=%v, Round=%v, Sequence=%v, Last proposer=%v, seed=%v, pick=%v.\n", id, node, round, sequence, v.lastProposer, seed, pick)
 	return node
 }
 
