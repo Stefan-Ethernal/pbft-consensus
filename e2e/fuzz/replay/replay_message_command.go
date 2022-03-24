@@ -115,9 +115,7 @@ LOOP:
 				node, exists := nodes[string(message.To)]
 				if !exists {
 					rmc.UI.Warn(fmt.Sprintf("Could not find node: %v to push message from .flow file", message.To))
-				} else if message.To != message.Message.From || message.Message.Type == pbft.MessageReq_Preprepare {
-					// since timeouts have .From property always empty, and To always non empty, they will be pushed to message queue
-					// for regular messages we will only push those where sender and receiver differ or if its a PrePrepare message
+				} else {
 					node.PushMessageInternal(message.Message)
 				}
 			}
