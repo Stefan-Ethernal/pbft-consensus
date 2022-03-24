@@ -16,10 +16,6 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-const (
-	MessagesBatchSize = 1000
-)
-
 // ReplayMessageCommand is a struct containing data for running replay-message command
 type ReplayMessageCommand struct {
 	UI cli.Ui
@@ -72,22 +68,20 @@ func (rmc *ReplayMessageCommand) Run(args []string) int {
 		messages := make([]*ReplayMessage, 0)
 		var sequence, previousSequence uint64
 		sequence, previousSequence = 1, 1
-		for scanner.Scan() {
+		for s.Scan() {
 			var message *ReplayMessage
-			if err := json.Unmarshal(scanner.Bytes(), &message); err != nil {
+			if err := json.Unmarshal(s.Bytes(), &message); err != nil {
 				rmc.UI.Error(fmt.Sprintf("Error happened on unmarshalling a message in .flow file. Reason: %v", err))
 				return
 			}
 
 			sequence = message.Message.View.Sequence
-
-			if sequence == previousSequence {
-				messages = append(messages, message)
-			} else {
+			if sequence != previousSequence {
 				previousSequence = sequence
 				messagesChannel <- messages
 				messages = nil
 			}
+			messages = append(messages, message)
 		}
 		doneChannel <- struct{}{}
 	}(scanner)
