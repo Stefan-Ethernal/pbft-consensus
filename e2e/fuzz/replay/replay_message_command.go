@@ -68,9 +68,9 @@ func (rmc *ReplayMessageCommand) Run(args []string) int {
 		messages := make([]*ReplayMessage, 0)
 		var sequence, previousSequence uint64
 		sequence, previousSequence = 1, 1
-		for scanner.Scan() {
+		for s.Scan() {
 			var message *ReplayMessage
-			if err := json.Unmarshal(scanner.Bytes(), &message); err != nil {
+			if err := json.Unmarshal(s.Bytes(), &message); err != nil {
 				rmc.UI.Error(fmt.Sprintf("Error happened on unmarshalling a message in .flow file. Reason: %v", err))
 				return
 			}
